@@ -1,0 +1,1538 @@
+openapi: 3.0.3
+info:
+  title: Astraeus AI API
+  description: |
+    REST API for the Astraeus AI video editing platform.
+
+    Astraeus AI is an AI-powered video editing platform built with a proprietary JSON composition engine
+    and an FFmpeg rendering core. The AI layer leverages Claude, HyperFrames, OpenAI Whisper, and ElevenLabs
+    to generate overlays, captions, voiceovers, and AI-driven video compositions.
+
+    All endpoints (except auth registration/login and health) require a valid JWT Bearer token.
+  version: 1.0.0
+  contact:
+    name: Astraeus AI Team
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.astraeus.ai/v1
+    description: Production
+  - url: https://staging-api.astraeus.ai/v1
+    description: Staging
+  - url: http://localhost:8000/v1
+    description: Local development
+
+tags:
+  - name: Health
+    description: Service health checks
+  - name: Auth
+    description: Authentication and token management
+  - name: Users
+    description: User profile management
+  - name: Projects
+    description: Video project management
+  - name: Media
+    description: Media upload and library management
+  - name: Renders
+    description: FFmpeg rendering job management
+  - name: AI
+    description: AI-driven video editing features (Claude, HyperFrames, Whisper, ElevenLabs)
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ============================================================
+  # HEALTH
+  # ============================================================
+  /health:
+    get:
+      tags: [Health]
+      summary: Service health check
+      security: []
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  # ============================================================
+  # AUTH
+  # ============================================================
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      security: []
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke refresh token
+      operationId: logoutUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '204':
+          description: Logged out successfully
+
+  # ============================================================
+  # USERS
+  # ============================================================
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get current user profile
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [Users]
+      summary: Update current user profile
+      operationId: updateCurrentUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    delete:
+      tags: [Users]
+      summary: Delete current user account
+      operationId: deleteCurrentUser
+      responses:
+        '204':
+          description: Account deleted
+
+  /users/me/quota:
+    get:
+      tags: [Users]
+      summary: Get current user usage quota
+      operationId: getCurrentUserQuota
+      responses:
+        '200':
+          description: Quota information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageQuota'
+
+  # ============================================================
+  # PROJECTS
+  # ============================================================
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List user projects
+      operationId: listProjects
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: archived
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Paginated list of projects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListResponse'
+
+    post:
+      tags: [Projects]
+      summary: Create a new project
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+
+  /projects/{project_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectIdParam'
+
+    get:
+      tags: [Projects]
+      summary: Get project by ID with full composition
+      operationId: getProject
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Projects]
+      summary: Update project metadata and composition
+      operationId: updateProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdateRequest'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Projects]
+      summary: Delete project
+      operationId: deleteProject
+      responses:
+        '204':
+          description: Project deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/versions:
+    parameters:
+      - $ref: '#/components/parameters/ProjectIdParam'
+
+    get:
+      tags: [Projects]
+      summary: List project version history
+      operationId: listProjectVersions
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Paginated version history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectVersionListResponse'
+
+  /projects/{project_id}/versions/{version_id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/ProjectIdParam'
+      - name: version_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      tags: [Projects]
+      summary: Restore project to a previous version
+      operationId: restoreProjectVersion
+      responses:
+        '200':
+          description: Project restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+
+  # ============================================================
+  # MEDIA
+  # ============================================================
+  /media:
+    get:
+      tags: [Media]
+      summary: List user media library
+      operationId: listMedia
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: media_type
+          in: query
+          schema:
+            $ref: '#/components/schemas/MediaType'
+      responses:
+        '200':
+          description: Paginated media list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaListResponse'
+
+  /media/upload-url:
+    post:
+      tags: [Media]
+      summary: Request a signed upload URL for direct upload to DigitalOcean Spaces
+      operationId: requestUploadUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadUrlRequest'
+      responses:
+        '200':
+          description: Signed upload URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadUrlResponse'
+
+  /media/confirm:
+    post:
+      tags: [Media]
+      summary: Confirm upload completion and trigger media processing
+      operationId: confirmUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmUploadRequest'
+      responses:
+        '201':
+          description: Media record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Media'
+
+  /media/{media_id}:
+    parameters:
+      - name: media_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Media]
+      summary: Get media file metadata
+      operationId: getMedia
+      responses:
+        '200':
+          description: Media details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Media'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Media]
+      summary: Delete media file
+      operationId: deleteMedia
+      responses:
+        '204':
+          description: Media deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # RENDERS
+  # ============================================================
+  /renders:
+    get:
+      tags: [Renders]
+      summary: List render jobs
+      operationId: listRenders
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/RenderStatus'
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Paginated render jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenderJobListResponse'
+
+    post:
+      tags: [Renders]
+      summary: Submit a new render job
+      operationId: submitRender
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenderJobCreateRequest'
+      responses:
+        '202':
+          description: Render job accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenderJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /renders/{job_id}:
+    parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [Renders]
+      summary: Get render job status
+      operationId: getRender
+      responses:
+        '200':
+          description: Render job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenderJob'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Renders]
+      summary: Cancel a queued or processing render job
+      operationId: cancelRender
+      responses:
+        '204':
+          description: Render job cancelled
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Job cannot be cancelled in its current state
+
+  # ============================================================
+  # AI
+  # ============================================================
+  /ai/overlay:
+    post:
+      tags: [AI]
+      summary: Generate an AI overlay via Claude and HyperFrames
+      description: |
+        Submits a prompt to Claude, which generates HyperFrames-compatible HTML.
+        HyperFrames renders the HTML to an MP4 overlay, which is then merged into
+        the project's composition as an `ai_overlay` track.
+      operationId: generateAIOverlay
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIOverlayRequest'
+      responses:
+        '202':
+          description: AI overlay task accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+
+  /ai/captions:
+    post:
+      tags: [AI]
+      summary: Auto-generate captions via OpenAI Whisper
+      operationId: generateCaptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AICaptionsRequest'
+      responses:
+        '202':
+          description: Caption generation task accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+
+  /ai/voiceover:
+    post:
+      tags: [AI]
+      summary: Generate AI voiceover via ElevenLabs
+      operationId: generateVoiceover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIVoiceoverRequest'
+      responses:
+        '202':
+          description: Voiceover task accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+
+  /ai/tasks:
+    get:
+      tags: [AI]
+      summary: List AI tasks
+      operationId: listAITasks
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+        - name: project_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: task_type
+          in: query
+          schema:
+            $ref: '#/components/schemas/AITaskType'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/AITaskStatus'
+      responses:
+        '200':
+          description: Paginated AI tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITaskListResponse'
+
+  /ai/tasks/{task_id}:
+    parameters:
+      - name: task_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags: [AI]
+      summary: Get AI task details and result
+      operationId: getAITask
+      responses:
+        '200':
+          description: AI task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AITask'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ============================================================
+# COMPONENTS
+# ============================================================
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    ProjectIdParam:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request payload
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    # ----------------------------------------------------------
+    # Common
+    # ----------------------------------------------------------
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          example: validation_error
+        message:
+          type: string
+          example: Field 'email' is required
+        details:
+          type: object
+          additionalProperties: true
+
+    HealthResponse:
+      type: object
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          example: ok
+        version:
+          type: string
+          example: 1.0.0
+        timestamp:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      required: [page, page_size, total, total_pages]
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+    # ----------------------------------------------------------
+    # Auth
+    # ----------------------------------------------------------
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          format: password
+        full_name:
+          type: string
+          maxLength: 255
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [access_token, refresh_token, token_type, expires_in, user]
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+          description: Access token TTL in seconds
+          example: 1800
+        user:
+          $ref: '#/components/schemas/User'
+
+    # ----------------------------------------------------------
+    # Users
+    # ----------------------------------------------------------
+    UserRole:
+      type: string
+      enum: [user, admin]
+
+    SubscriptionTier:
+      type: string
+      enum: [free, pro, enterprise]
+
+    User:
+      type: object
+      required: [id, email, role, subscription_tier, is_active, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        subscription_tier:
+          $ref: '#/components/schemas/SubscriptionTier'
+        is_active:
+          type: boolean
+        is_verified:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        last_login_at:
+          type: string
+          format: date-time
+
+    UserUpdateRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          maxLength: 255
+        password:
+          type: string
+          minLength: 8
+          format: password
+
+    UsageQuota:
+      type: object
+      required:
+        - storage_bytes_used
+        - storage_bytes_limit
+        - render_minutes_used
+        - render_minutes_limit
+        - ai_tokens_used
+        - ai_tokens_limit
+        - period_end
+      properties:
+        storage_bytes_used:
+          type: integer
+          format: int64
+        storage_bytes_limit:
+          type: integer
+          format: int64
+        render_minutes_used:
+          type: number
+        render_minutes_limit:
+          type: number
+        ai_tokens_used:
+          type: integer
+        ai_tokens_limit:
+          type: integer
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+
+    # ----------------------------------------------------------
+    # Composition Schema (Core IP)
+    # ----------------------------------------------------------
+    Resolution:
+      type: object
+      required: [width, height]
+      properties:
+        width:
+          type: integer
+          example: 1920
+        height:
+          type: integer
+          example: 1080
+
+    Position:
+      type: object
+      required: [x, y]
+      properties:
+        x:
+          type: number
+        y:
+          type: number
+        anchor:
+          type: string
+          enum: [top-left, top, top-right, left, center, right, bottom-left, bottom, bottom-right]
+          default: center
+
+    TextStyle:
+      type: object
+      properties:
+        fontFamily:
+          type: string
+          example: Inter
+        fontSize:
+          type: number
+          example: 48
+        color:
+          type: string
+          example: '#FFFFFF'
+        bold:
+          type: boolean
+        italic:
+          type: boolean
+        shadow:
+          type: boolean
+        backgroundColor:
+          type: string
+
+    Animation:
+      type: object
+      properties:
+        in:
+          type: string
+          enum: [none, fadeIn, slideIn, scaleIn]
+        out:
+          type: string
+          enum: [none, fadeOut, slideOut, scaleOut]
+        duration:
+          type: number
+          default: 0.5
+
+    Transition:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [cut, fade, crossfade, slide, dissolve]
+        duration:
+          type: number
+          example: 0.5
+
+    VideoClip:
+      type: object
+      required: [id, src, startOnTimeline, endOnTimeline, trimIn, trimOut]
+      properties:
+        id:
+          type: string
+        src:
+          type: string
+          description: Storage key or signed URL of the source media
+        startOnTimeline:
+          type: number
+        endOnTimeline:
+          type: number
+        trimIn:
+          type: number
+        trimOut:
+          type: number
+        transition:
+          $ref: '#/components/schemas/Transition'
+
+    AudioClip:
+      type: object
+      required: [id, src, startOnTimeline, endOnTimeline]
+      properties:
+        id:
+          type: string
+        src:
+          type: string
+        startOnTimeline:
+          type: number
+        endOnTimeline:
+          type: number
+        volume:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 1
+        fadeIn:
+          type: number
+        fadeOut:
+          type: number
+
+    TextOverlay:
+      type: object
+      required: [id, text, startOnTimeline, endOnTimeline, position]
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+        startOnTimeline:
+          type: number
+        endOnTimeline:
+          type: number
+        position:
+          $ref: '#/components/schemas/Position'
+        style:
+          $ref: '#/components/schemas/TextStyle'
+        animation:
+          $ref: '#/components/schemas/Animation'
+
+    ImageOverlay:
+      type: object
+      required: [id, src, startOnTimeline, endOnTimeline, position]
+      properties:
+        id:
+          type: string
+        src:
+          type: string
+        startOnTimeline:
+          type: number
+        endOnTimeline:
+          type: number
+        position:
+          $ref: '#/components/schemas/Position'
+        width:
+          type: number
+        height:
+          type: number
+        opacity:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 1
+
+    AIOverlayClip:
+      type: object
+      required: [id, src, startOnTimeline, endOnTimeline]
+      properties:
+        id:
+          type: string
+        src:
+          type: string
+        startOnTimeline:
+          type: number
+        endOnTimeline:
+          type: number
+        prompt:
+          type: string
+        ai_task_id:
+          type: string
+          format: uuid
+
+    Track:
+      type: object
+      required: [id, type]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [video, audio, text, image, ai_overlay]
+        source:
+          type: string
+          enum: [hyperframes, claude_direct]
+          description: Only for ai_overlay tracks
+        clips:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/VideoClip'
+              - $ref: '#/components/schemas/AudioClip'
+              - $ref: '#/components/schemas/AIOverlayClip'
+        overlays:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/TextOverlay'
+              - $ref: '#/components/schemas/ImageOverlay'
+
+    Composition:
+      type: object
+      required: [resolution, fps, duration, tracks]
+      properties:
+        resolution:
+          $ref: '#/components/schemas/Resolution'
+        fps:
+          type: integer
+          example: 30
+        duration:
+          type: number
+          example: 60.0
+        tracks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Track'
+
+    # ----------------------------------------------------------
+    # Projects
+    # ----------------------------------------------------------
+    Project:
+      type: object
+      required: [id, owner_id, name, resolution_width, resolution_height, fps, duration_seconds, composition, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        thumbnail_url:
+          type: string
+          format: uri
+        resolution_width:
+          type: integer
+        resolution_height:
+          type: integer
+        fps:
+          type: integer
+        duration_seconds:
+          type: number
+        composition:
+          $ref: '#/components/schemas/Composition'
+        is_archived:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProjectSummary:
+      type: object
+      required: [id, name, duration_seconds, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        thumbnail_url:
+          type: string
+          format: uri
+        duration_seconds:
+          type: number
+        is_archived:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProjectCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        resolution_width:
+          type: integer
+          default: 1920
+        resolution_height:
+          type: integer
+          default: 1080
+        fps:
+          type: integer
+          default: 30
+
+    ProjectUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        composition:
+          $ref: '#/components/schemas/Composition'
+        is_archived:
+          type: boolean
+
+    ProjectListResponse:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectSummary'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ProjectVersion:
+      type: object
+      required: [id, project_id, version_number, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        version_number:
+          type: integer
+        change_summary:
+          type: string
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    ProjectVersionListResponse:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectVersion'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    # ----------------------------------------------------------
+    # Media
+    # ----------------------------------------------------------
+    MediaType:
+      type: string
+      enum: [video, audio, image]
+
+    MediaStatus:
+      type: string
+      enum: [uploading, processing, ready, failed]
+
+    Media:
+      type: object
+      required: [id, owner_id, filename, original_filename, mime_type, media_type, status, size_bytes, storage_url, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        original_filename:
+          type: string
+        mime_type:
+          type: string
+        media_type:
+          $ref: '#/components/schemas/MediaType'
+        status:
+          $ref: '#/components/schemas/MediaStatus'
+        size_bytes:
+          type: integer
+          format: int64
+        storage_url:
+          type: string
+          format: uri
+        duration_seconds:
+          type: number
+        width:
+          type: integer
+        height:
+          type: integer
+        fps:
+          type: number
+        bitrate:
+          type: integer
+        codec:
+          type: string
+        thumbnail_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+
+    MediaListResponse:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Media'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    UploadUrlRequest:
+      type: object
+      required: [filename, mime_type, size_bytes]
+      properties:
+        filename:
+          type: string
+        mime_type:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+
+    UploadUrlResponse:
+      type: object
+      required: [upload_url, storage_key, expires_at]
+      properties:
+        upload_url:
+          type: string
+          format: uri
+          description: Signed URL for PUT upload to DigitalOcean Spaces
+        storage_key:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    ConfirmUploadRequest:
+      type: object
+      required: [storage_key, filename, mime_type, size_bytes]
+      properties:
+        storage_key:
+          type: string
+        filename:
+          type: string
+        mime_type:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+
+    # ----------------------------------------------------------
+    # Renders
+    # ----------------------------------------------------------
+    RenderStatus:
+      type: string
+      enum: [queued, processing, completed, failed, cancelled]
+
+    RenderJob:
+      type: object
+      required: [id, project_id, user_id, status, progress, queued_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/RenderStatus'
+        progress:
+          type: number
+          minimum: 0
+          maximum: 100
+        output_url:
+          type: string
+          format: uri
+        output_size_bytes:
+          type: integer
+          format: int64
+        output_duration_seconds:
+          type: number
+        resolution_width:
+          type: integer
+        resolution_height:
+          type: integer
+        fps:
+          type: integer
+        error_message:
+          type: string
+        queued_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    RenderJobCreateRequest:
+      type: object
+      required: [project_id]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        resolution_width:
+          type: integer
+          description: Override project resolution
+        resolution_height:
+          type: integer
+        fps:
+          type: integer
+
+    RenderJobListResponse:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RenderJob'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    # ----------------------------------------------------------
+    # AI
+    # ----------------------------------------------------------
+    AITaskType:
+      type: string
+      enum:
+        - overlay_generation
+        - auto_caption
+        - voiceover
+        - script_to_video
+        - broll_search
+        - background_removal
+
+    AITaskStatus:
+      type: string
+      enum: [pending, processing, completed, failed]
+
+    AITask:
+      type: object
+      required: [id, project_id, user_id, task_type, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        task_type:
+          $ref: '#/components/schemas/AITaskType'
+        status:
+          $ref: '#/components/schemas/AITaskStatus'
+        prompt:
+          type: string
+        context:
+          type: object
+          additionalProperties: true
+        result:
+          type: object
+          additionalProperties: true
+        error_message:
+          type: string
+        tokens_used:
+          type: integer
+        cost_usd:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    AITaskListResponse:
+      type: object
+      required: [items, meta]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AITask'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    AIOverlayRequest:
+      type: object
+      required: [project_id, prompt]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        prompt:
+          type: string
+          description: Natural language description of the overlay
+          example: Animated lower third with speaker name John Doe
+        start_on_timeline:
+          type: number
+          description: Where to place the overlay on the timeline
+        duration_seconds:
+          type: number
+          description: Desired overlay duration
+
+    AICaptionsRequest:
+      type: object
+      required: [project_id, media_id]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        media_id:
+          type: string
+          format: uuid
+        language:
+          type: string
+          default: en
+
+    AIVoiceoverRequest:
+      type: object
+      required: [project_id, script, voice_id]
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        script:
+          type: string
+          description: Text to convert to speech
+        voice_id:
+          type: string
+          description: ElevenLabs voice ID
