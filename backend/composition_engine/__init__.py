@@ -1,0 +1,56 @@
+from composition_engine.schema import (
+    Composition,
+    Track,
+    VideoClip,
+    AudioClip,
+    AIOverlayClip,
+    TextOverlay,
+    ImageOverlay,
+    Resolution,
+    Position,
+    TextStyle,
+    Animation,
+    Transition,
+    TrackType,
+    TransitionType,
+    AnchorPoint,
+    AnimationTypeIn,
+    AnimationTypeOut,
+)
+from composition_engine.validator import validate_composition, CompositionValidationError
+from composition_engine.normalizer import normalize_composition
+from composition_engine.resolver import resolve_z_order
+from composition_engine.serializer import (
+    composition_to_dict,
+    composition_from_dict,
+    composition_to_json,
+    composition_from_json,
+)
+
+__all__ = [
+    "Composition",
+    "Track",
+    "VideoClip",
+    "AudioClip",
+    "AIOverlayClip",
+    "TextOverlay",
+    "ImageOverlay",
+    "Resolution",
+    "Position",
+    "TextStyle",
+    "Animation",
+    "Transition",
+    "TrackType",
+    "TransitionType",
+    "AnchorPoint",
+    "AnimationTypeIn",
+    "AnimationTypeOut",
+    "validate_composition",
+    "CompositionValidationError",
+    "normalize_composition",
+    "resolve_z_order",
+    "composition_to_dict",
+    "composition_from_dict",
+    "composition_to_json",
+    "composition_from_json",
+]
