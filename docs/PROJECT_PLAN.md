@@ -24,12 +24,12 @@ Step-by-step build plan broken into small, focused phases. Each phase produces a
 
 **Goal:** Create the monorepo structure and initial tooling.
 
-- [ ] Initialize git repository
-- [ ] Create directory structure (`frontend/`, `backend/`, `docs/`)
-- [ ] Copy `README.md`, `openapi.yaml`, `architecture.dsl`, `schema.dbml` to `docs/`
-- [ ] Add `.gitignore` for Python, Node, env files, FFmpeg outputs
-- [ ] Add `.env.example` at root
-- [ ] Initialize `docker-compose.yml` with PostgreSQL and Redis services
+- [X] Initialize git repository
+- [X] Create directory structure (`frontend/`, `backend/`, `docs/`)
+- [X] Copy `README.md`, `openapi.yaml`, `architecture.dsl`, `schema.dbml` to `docs/`
+- [X] Add `.gitignore` for Python, Node, env files, FFmpeg outputs
+- [X] Add `.env.example` at root
+- [X] Initialize `docker-compose.yml` with PostgreSQL and Redis services
 
 **Deliverable:** Clean repo skeleton committed to GitHub.
 
